@@ -1,0 +1,4 @@
+*.sp text eol=lf
+*.inc text eol=lf
+*.sp linguist-language=SourcePawn
+*.inc linguist-language=SourcePawn
