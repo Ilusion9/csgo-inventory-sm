@@ -12,7 +12,7 @@ public Plugin myinfo =
 {
 	name = "Inventory",
 	author = "Ilusion",
-	description = "Inventory preferences.",
+	description = "",
 	version = "1.0",
 	url = "https://github.com/Ilusion9/"
 };
@@ -35,6 +35,8 @@ enum CTWeapon
 	CTWeapon_MAX_WEAPONS
 }
 
+float g_LastSnapshotTime;
+
 Cookie g_Cookie_TInventory;
 Cookie g_Cookie_CTInventory;
 
@@ -52,7 +54,7 @@ public void OnPluginStart()
 	
 	HookEvent("round_prestart", Event_RoundPreStart);
 	
-	RegConsoleCmd("sm_inventory", Command_Invantory);
+	RegConsoleCmd("sm_inventory", Command_Inventory);
 	
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -81,6 +83,11 @@ public void OnPluginEnd()
 		
 		SaveClientInventory(i);
 	}
+}
+
+public void OnMapStart()
+{
+	g_LastSnapshotTime = 0.0;
 }
 
 public void OnMapEnd()
@@ -122,10 +129,14 @@ public void OnClientDisconnect(int client)
 
 public void Event_RoundPreStart(Event event, const char[] name, bool dontBroadcast)
 {
+	float gameTime = GetGameTime();
+	
+	g_LastSnapshotTime = gameTime;
+	
 	ClearTrie_Ex(view_as<StringMap>(g_Map_Weapons));
 }
 
-public Action Command_Invantory(int client, int args)
+public Action Command_Inventory(int client, int args)
 {
 	if (!client || !IsClientInGame(client))
 	{
@@ -146,9 +157,40 @@ public void SDK_WeaponSpawn(int entity)
 		return;
 	}
 	
-	g_Map_Weapons.SetValue(entityRef, true);
+	float gameTime = GetGameTime();
+	
+	g_Map_Weapons.SetValue(entityRef, gameTime);
 	
 	RequestFrame(Frame_WeaponSpawn, EntIndexToEntRef_Ex(entity));
+	
+	if (g_LastSnapshotTime && gameTime - g_LastSnapshotTime < 60.0)
+	{
+		return;
+	}
+	
+	IntMapSnapshot list = g_Map_Weapons.Snapshot();
+	
+	for (int i = 0; i < list.Length; i++)
+	{
+		int key = list.GetKey(i);
+		int value;
+		
+		if (!g_Map_Weapons.GetValue(key, value))
+		{
+			continue;
+		}
+		
+		if (gameTime - value < 60.0)
+		{
+			continue;
+		}
+		
+		g_Map_Weapons.Remove(key);
+	}
+	
+	delete list;
+	
+	g_LastSnapshotTime = gameTime;
 }
 
 public int Menu_Inventory(Menu menu, MenuAction action, int param1, int param2)
@@ -189,6 +231,11 @@ public int Menu_TerroristInventory(Menu menu, MenuAction action, int param1, int
 	}
 	else if (action == MenuAction_Cancel)
 	{
+		if (!IsClientInGame(param1))
+		{
+			return 0;
+		}
+		
 		if (param2 == MenuCancel_ExitBack)
 		{
 			DisplayInventoryMenu(param1);
@@ -253,6 +300,11 @@ public int Menu_CounterTerroristInventory(Menu menu, MenuAction action, int para
 	}
 	else if (action == MenuAction_Cancel)
 	{
+		if (!IsClientInGame(param1))
+		{
+			return 0;
+		}
+		
 		if (param2 == MenuCancel_ExitBack)
 		{
 			DisplayInventoryMenu(param1);
@@ -629,11 +681,11 @@ void DisplayTerroristInventoryMenu(int client)
 	
 	if (g_TInventory[client][TWeapon_TEC9] == CSWeapon_TEC9)
 	{
-		menu.AddItem("#tec9", "Tec9 | CZ775A [Tec9]");
+		menu.AddItem("#tec9", "Tec-9 | CZ75-Auto [Tec-9]");
 	}
 	else
 	{
-		menu.AddItem("#tec9", "Tec9 | CZ775A [CZ775A]");
+		menu.AddItem("#tec9", "Tec-9 | CZ75-Auto [CZ75-Auto]");
 	}
 	
 	if (g_TInventory[client][TWeapon_DEAGLE] == CSWeapon_DEAGLE)
@@ -647,11 +699,11 @@ void DisplayTerroristInventoryMenu(int client)
 	
 	if (g_TInventory[client][TWeapon_MP7] == CSWeapon_MP7)
 	{
-		menu.AddItem("#mp7", "MP7 | MP5SD [MP7]");
+		menu.AddItem("#mp7", "MP7 | MP5-SD [MP7]");
 	}
 	else
 	{
-		menu.AddItem("#mp7", "MP7 | MP5SD [MP5SD]");
+		menu.AddItem("#mp7", "MP7 | MP5-SD [MP5-SD]");
 	}
 	
 	menu.ExitBackButton = true;
@@ -666,20 +718,20 @@ void DisplayCounterTerroristInventoryMenu(int client)
 	
 	if (g_CTInventory[client][CTWeapon_HKP2000] == CSWeapon_HKP2000)
 	{
-		menu.AddItem("#hkp2000", "HKP2000 | USP-S [HKP2000]");
+		menu.AddItem("#hkp2000", "P2000 | USP-S [P2000]");
 	}
 	else
 	{
-		menu.AddItem("#hkp2000", "HKP2000 | USP-S [USP-S]");
+		menu.AddItem("#hkp2000", "P2000 | USP-S [USP-S]");
 	}
 	
 	if (g_CTInventory[client][CTWeapon_FIVESEVEN] == CSWeapon_FIVESEVEN)
 	{
-		menu.AddItem("#fiveseven", "Fiveseven | CZ775A [Fiveseven]");
+		menu.AddItem("#fiveseven", "Five-Seven | CZ75-Auto [Five-Seven]");
 	}
 	else
 	{
-		menu.AddItem("#fiveseven", "Fiveseven | CZ775A [CZ775A]");
+		menu.AddItem("#fiveseven", "Five-Seven | CZ75-Auto [CZ75-Auto]");
 	}
 	
 	if (g_CTInventory[client][CTWeapon_DEAGLE] == CSWeapon_DEAGLE)
@@ -693,11 +745,11 @@ void DisplayCounterTerroristInventoryMenu(int client)
 	
 	if (g_CTInventory[client][CTWeapon_MP7] == CSWeapon_MP7)
 	{
-		menu.AddItem("#mp7", "MP7 | MP5SD [MP7]");
+		menu.AddItem("#mp7", "MP7 | MP5-SD [MP7]");
 	}
 	else
 	{
-		menu.AddItem("#mp7", "MP7 | MP5SD [MP5SD]");
+		menu.AddItem("#mp7", "MP7 | MP5-SD [MP5-SD]");
 	}
 	
 	if (g_CTInventory[client][CTWeapon_M4A1] == CSWeapon_M4A1)
@@ -715,7 +767,7 @@ void DisplayCounterTerroristInventoryMenu(int client)
 
 bool IsEntityClient(int client)
 {
-	return (client > 0 && client <= MaxClients);
+	return client > 0 && client <= MaxClients;
 }
 
 int EntIndexToEntRef_Ex(int entity)
